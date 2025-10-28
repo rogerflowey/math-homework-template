@@ -5,8 +5,8 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 mango_dir="$repo_root/.mango"
 venv_path="$mango_dir/venv"
 declare -a font_targets=(
-	"$HOME/.local/share/fonts/sourcehan"
-	"$mango_dir/fonts/sourcehan"
+	"$HOME/.local/share/fonts/fandol"
+	"$mango_dir/fonts/fandol"
 )
 primary_font_dir="${font_targets[0]}"
 
@@ -95,48 +95,54 @@ fi
 
 echo "Checking TeX Live packages..."
 if command -v kpsewhich >/dev/null 2>&1; then
-	source_han_fonts_available() {
-		local serif_ready=0
-		local sans_ready=0
-		local -a source_han_files=(
-			SourceHanSerifSC-Regular.otf
-			SourceHanSerifSC-Bold.otf
-			SourceHanSansSC-Regular.otf
-			SourceHanSansSC-Bold.otf
-		)
+	font_available() {
+		local font="$1"
+		local dir
+		for dir in "${font_targets[@]}"; do
+			if [[ -f "$dir/$font" ]]; then
+				return 0
+			fi
+		done
 
 		if command -v fc-list >/dev/null 2>&1; then
-			fc-list | grep -qi 'Source Han Serif SC' && serif_ready=1 || true
-			fc-list | grep -qi 'Source Han Sans SC' && sans_ready=1 || true
+			local match
+			match=$(fc-list ":file=$font" -f '%{file}\n' 2>/dev/null | head -n1 || true)
+			if [[ -n "$match" ]]; then
+				return 0
+			fi
 		fi
 
-		if (( serif_ready == 0 || sans_ready == 0 )); then
-			[[ -f "$primary_font_dir/SourceHanSerifSC-Regular.otf" ]] && serif_ready=1 || true
-			[[ -f "$primary_font_dir/SourceHanSansSC-Regular.otf" ]] && sans_ready=1 || true
+		if command -v kpsewhich >/dev/null 2>&1; then
+			if kpsewhich "$font" >/dev/null 2>&1; then
+				return 0
+			fi
 		fi
 
-		if (( serif_ready == 0 || sans_ready == 0 )); then
-			for _font in "${source_han_files[@]}"; do
-				if kpsewhich "$_font" >/dev/null 2>&1; then
-					case "$_font" in
-						SourceHanSerifSC-*) serif_ready=1 ;;
-						SourceHanSansSC-*) sans_ready=1 ;;
-					esac
-				fi
-			done
-		fi
-
-		if (( serif_ready == 1 && sans_ready == 1 )); then
-			return 0
-		fi
 		return 1
 	}
 
-	download_source_han_fonts() {
+	declare -a fandol_font_files=(
+		FandolSong-Regular.otf
+		FandolSong-Bold.otf
+		FandolHei-Regular.otf
+		FandolHei-Bold.otf
+	)
+
+	fandol_fonts_available() {
+		local font
+		for font in "${fandol_font_files[@]}"; do
+			if ! font_available "$font"; then
+				return 1
+			fi
+		done
+		return 0
+	}
+
+	download_fandol_fonts() {
 		local tmp_dir
-		tmp_dir=$(mktemp -d 2>/dev/null || mktemp -d -t sourcehan)
+		tmp_dir=$(mktemp -d 2>/dev/null || mktemp -d -t fandol)
 		if [[ ! -d "$tmp_dir" ]]; then
-			echo "Warning: Unable to create temporary directory for Source Han fonts download." >&2
+			echo "Warning: Unable to create temporary directory for Fandol fonts download." >&2
 			return 1
 		fi
 
@@ -146,7 +152,7 @@ if command -v kpsewhich >/dev/null 2>&1; then
 		elif command -v wget >/dev/null 2>&1; then
 			downloader="wget"
 		else
-			echo "Warning: Source Han fonts missing and neither curl nor wget is available for download." >&2
+			echo "Warning: Fandol fonts missing and neither curl nor wget is available for download." >&2
 			rm -rf "$tmp_dir"
 			return 1
 		fi
@@ -157,90 +163,68 @@ if command -v kpsewhich >/dev/null 2>&1; then
 		elif command -v bsdtar >/dev/null 2>&1; then
 			unarchiver="bsdtar"
 		else
-			echo "Warning: Source Han fonts missing and neither unzip nor bsdtar is available to extract archives." >&2
+			echo "Warning: Fandol fonts missing and neither unzip nor bsdtar is available to extract archives." >&2
 			rm -rf "$tmp_dir"
 			return 1
 		fi
 
-		declare -A archives=(
-			[sans]="https://github.com/adobe-fonts/source-han-sans/releases/download/2.004R/SourceHanSansSC.zip"
-			[serif]="https://github.com/adobe-fonts/source-han-serif/releases/download/2.001R/09_SourceHanSerifSC.zip"
-		)
+		local archive_url="https://mirrors.ctan.org/fonts/fandol.zip"
+		local archive_path="$tmp_dir/fandol.zip"
 
-		local fetched=0
-		local family
-		for family in "${!archives[@]}"; do
-			local url="${archives[$family]}"
-			local archive_path="$tmp_dir/${family}.zip"
-			local family_label
-			case "$family" in
-				sans) family_label="Sans" ;;
-				serif) family_label="Serif" ;;
-				*) family_label="$family" ;;
-			esac
+		echo "Downloading Fandol fonts..."
+		if [[ "$downloader" == "curl" ]]; then
+			if ! curl -fL --retry 3 --retry-delay 2 -o "$archive_path" "$archive_url"; then
+				echo "Warning: Failed to download $archive_url" >&2
+				rm -rf "$tmp_dir"
+				return 1
+			fi
+		else
+			if ! wget --quiet --tries=3 --waitretry=2 --retry-connrefused -O "$archive_path" "$archive_url"; then
+				echo "Warning: Failed to download $archive_url" >&2
+				rm -rf "$tmp_dir"
+				return 1
+			fi
+		fi
 
-			echo "Downloading Source Han ${family_label} fonts..."
-			if [[ "$downloader" == "curl" ]]; then
-				if ! curl -fL --retry 3 --retry-delay 2 -o "$archive_path" "$url"; then
-					echo "Warning: Failed to download $url" >&2
-					continue
+		if [[ ! -s "$archive_path" ]]; then
+			echo "Warning: Downloaded archive $archive_path is empty." >&2
+			rm -rf "$tmp_dir"
+			return 1
+		fi
+
+		local extract_dir="$tmp_dir/extracted"
+		mkdir -p "$extract_dir"
+		if [[ "$unarchiver" == "unzip" ]]; then
+			if ! unzip -q "$archive_path" -d "$extract_dir"; then
+				echo "Warning: Failed to extract $archive_path" >&2
+				rm -rf "$tmp_dir"
+				return 1
+			fi
+		else
+			if ! bsdtar -xf "$archive_path" -C "$extract_dir"; then
+				echo "Warning: Failed to extract $archive_path" >&2
+				rm -rf "$tmp_dir"
+				return 1
+			fi
+		fi
+
+		local copied_any=0
+		local font
+		for font in "${fandol_font_files[@]}"; do
+			local found
+			found=$(find "$extract_dir" -type f -name "$font" -print -quit 2>/dev/null || true)
+			if [[ -n "$found" ]]; then
+				if copy_font_to_targets "$found"; then
+					copied_any=1
 				fi
 			else
-				if ! wget --quiet --tries=3 --waitretry=2 --retry-connrefused -O "$archive_path" "$url"; then
-					echo "Warning: Failed to download $url" >&2
-					continue
-				fi
-			fi
-
-			if [[ ! -s "$archive_path" ]]; then
-				echo "Warning: Downloaded archive $archive_path is empty." >&2
-				continue
-			fi
-
-			local extract_dir="$tmp_dir/${family}-extract"
-			mkdir -p "$extract_dir"
-			if [[ "$unarchiver" == "unzip" ]]; then
-				if ! unzip -q "$archive_path" -d "$extract_dir"; then
-					echo "Warning: Failed to extract $archive_path" >&2
-					continue
-				fi
-			else
-				if ! bsdtar -xf "$archive_path" -C "$extract_dir"; then
-					echo "Warning: Failed to extract $archive_path" >&2
-					continue
-				fi
-			fi
-
-			local -a targets
-			case "$family" in
-				sans) targets=(SourceHanSansSC-Regular.otf SourceHanSansSC-Bold.otf) ;;
-				serif) targets=(SourceHanSerifSC-Regular.otf SourceHanSerifSC-Bold.otf) ;;
-				*) targets=() ;;
-			esac
-
-			local copied_any=0
-			local _font
-			for _font in "${targets[@]}"; do
-				local found
-				found=$(find "$extract_dir" -type f -name "$_font" -print -quit 2>/dev/null || true)
-				if [[ -n "$found" ]]; then
-					if copy_font_to_targets "$found"; then
-						copied_any=1
-						fetched=1
-					fi
-				else
-					echo "Warning: Did not locate $_font in the downloaded Source Han ${family_label} archive." >&2
-				fi
-			done
-
-			if (( copied_any == 0 )); then
-				echo "Warning: No Source Han ${family_label} fonts were copied from the downloaded archive." >&2
+				echo "Warning: Did not locate $font in the downloaded Fandol archive." >&2
 			fi
 		done
 
 		rm -rf "$tmp_dir"
 
-		if (( fetched == 1 )); then
+		if (( copied_any == 1 )); then
 			refresh_font_cache
 			return 0
 		fi
@@ -248,172 +232,151 @@ if command -v kpsewhich >/dev/null 2>&1; then
 		return 1
 	}
 
-	ensure_source_han_fonts() {
-		local -a source_han_files=(
-			SourceHanSerifSC-Regular.otf
-			SourceHanSerifSC-Bold.otf
-			SourceHanSansSC-Regular.otf
-			SourceHanSansSC-Bold.otf
-		)
-
-		locate_font_source() {
-			local target="$1"
-			local candidate
-			local dir
-			for dir in "${font_targets[@]}"; do
-				candidate="$dir/$target"
-				if [[ -f "$candidate" ]]; then
-					echo "$candidate"
-					return 0
-				fi
-			done
-
-			if command -v fc-list >/dev/null 2>&1; then
-				candidate=$(fc-list ":file=$target" -f '%{file}\n' 2>/dev/null | head -n1 || true)
-				if [[ -n "$candidate" ]]; then
-					echo "$candidate"
-					return 0
-				fi
+	locate_font_source() {
+		local target="$1"
+		local candidate
+		local dir
+		for dir in "${font_targets[@]}"; do
+			candidate="$dir/$target"
+			if [[ -f "$candidate" ]]; then
+				echo "$candidate"
+				return 0
 			fi
+		done
 
+		if command -v fc-list >/dev/null 2>&1; then
+			candidate=$(fc-list ":file=$target" -f '%{file}\n' 2>/dev/null | head -n1 || true)
+			if [[ -n "$candidate" ]]; then
+				echo "$candidate"
+				return 0
+			fi
+		fi
+
+		if command -v kpsewhich >/dev/null 2>&1; then
 			candidate=$(kpsewhich "$target" 2>/dev/null || true)
 			if [[ -n "$candidate" ]]; then
 				echo "$candidate"
 				return 0
 			fi
+		fi
 
-			return 1
-		}
+		return 1
+	}
 
-		ensure_project_font_cache() {
-			local project_cache="$mango_dir/fonts/sourcehan"
-			local -a required_fonts=(
-				SourceHanSerifSC-Regular.otf
-				SourceHanSerifSC-Bold.otf
-				SourceHanSansSC-Regular.otf
-				SourceHanSansSC-Bold.otf
-			)
-			local font
-			local missing=0
-			for font in "${required_fonts[@]}"; do
-				if [[ ! -f "$project_cache/$font" ]]; then
-					missing=1
-					break
-				fi
-			done
-
-			if (( missing == 0 )); then
-				return 0
+	ensure_project_font_cache() {
+		local project_cache="$mango_dir/fonts/fandol"
+		local font
+		local missing=0
+		for font in "${fandol_font_files[@]}"; do
+			if [[ ! -f "$project_cache/$font" ]]; then
+				missing=1
+				break
 			fi
+		done
 
-			local sourced_any=0
-			for font in "${required_fonts[@]}"; do
-				if [[ -f "$project_cache/$font" ]]; then
-					continue
-				fi
-				local source_path
-				source_path=$(locate_font_source "$font" || true)
-				if [[ -n "$source_path" ]]; then
-					if copy_font_to_targets "$source_path"; then
-						sourced_any=1
-					fi
-				fi
-			done
+		if (( missing == 0 )); then
+			return 0
+		fi
 
-			if (( sourced_any == 0 )); then
-				echo "Attempting to download Source Han fonts for project cache..."
-				download_source_han_fonts || true
+		local sourced_any=0
+		for font in "${fandol_font_files[@]}"; do
+			if [[ -f "$project_cache/$font" ]]; then
+				continue
 			fi
-
-			local missing_after=0
-			for font in "${required_fonts[@]}"; do
-				if [[ ! -f "$project_cache/$font" ]]; then
-					missing_after=1
+			local source_path
+			source_path=$(locate_font_source "$font" || true)
+			if [[ -n "$source_path" ]]; then
+				if copy_font_to_targets "$source_path"; then
+					sourced_any=1
 				fi
-			done
-
-			if (( missing_after == 0 )); then
-				refresh_font_cache
-				return 0
 			fi
+		done
 
-			echo "Warning: Source Han fonts could not be staged under $project_cache." >&2
-			return 1
-		}
+		if (( sourced_any == 0 )); then
+			echo "Attempting to download Fandol fonts for project cache..."
+			download_fandol_fonts || true
+		fi
 
-		if source_han_fonts_available; then
+		local missing_after=0
+		for font in "${fandol_font_files[@]}"; do
+			if [[ ! -f "$project_cache/$font" ]]; then
+				missing_after=1
+			fi
+		done
+
+		if (( missing_after == 0 )); then
+			refresh_font_cache
+			return 0
+		fi
+
+		echo "Warning: Fandol fonts could not be staged under $project_cache." >&2
+		return 1
+	}
+
+	ensure_fandol_fonts() {
+		if fandol_fonts_available; then
 			ensure_project_font_cache || true
-			echo "Source Han fonts detected."
+			echo "Fandol fonts detected."
 			return 0
 		fi
 
 		local install_attempted=0
+
 		if command -v tlmgr >/dev/null 2>&1; then
-			echo "Installing Source Han fonts via tlmgr..."
+			echo "Installing Fandol fonts via tlmgr..."
 			install_attempted=1
-			if ! tlmgr install sourcehan sourcehan-serif sourcehan-sans >/dev/null 2>&1; then
-				echo "Warning: tlmgr failed to install Source Han fonts." >&2
+			if tlmgr install fandol >/dev/null 2>&1; then
+				refresh_font_cache
+				if fandol_fonts_available; then
+					ensure_project_font_cache || true
+					echo "Fandol fonts are ready for XeLaTeX."
+					return 0
+				fi
+			else
+				echo "Warning: tlmgr failed to install Fandol fonts." >&2
 			fi
 		fi
 
-		if ! source_han_fonts_available && command -v apt-get >/dev/null 2>&1; then
+		if ! fandol_fonts_available && command -v apt-get >/dev/null 2>&1; then
 			if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
-				local -a apt_packages=(fonts-source-han-sans fonts-source-han-serif)
-				echo "Attempting to install Source Han fonts via apt (${apt_packages[*]})..."
+				local -a apt_packages=(fonts-fandol)
+				echo "Attempting to install Fandol fonts via apt (${apt_packages[*]})..."
 				install_attempted=1
 				if sudo apt-get update && sudo apt-get install -y "${apt_packages[@]}"; then
 					refresh_font_cache
+					if fandol_fonts_available; then
+						ensure_project_font_cache || true
+						echo "Fandol fonts are ready for XeLaTeX."
+						return 0
+					fi
 				else
-					echo "Warning: apt installation of Source Han fonts failed or packages unavailable." >&2
+					echo "Warning: apt installation of Fandol fonts failed or packages unavailable." >&2
 				fi
 			else
-				echo "Warning: Source Han fonts missing and sudo access unavailable for apt installation." >&2
+				echo "Warning: Fandol fonts missing and sudo access unavailable for apt installation." >&2
 			fi
 		fi
 
-		if ! source_han_fonts_available; then
-			local copied_from_texmf=0
-			local _font
-			for _font in "${source_han_files[@]}"; do
-				local font_path
-				font_path=$(kpsewhich "$_font" 2>/dev/null || true)
-				if [[ -n "$font_path" && -f "$font_path" ]]; then
-					if copy_font_to_targets "$font_path"; then
-						copied_from_texmf=1
-					fi
-				fi
-			done
-
-			if (( copied_from_texmf == 1 )); then
-				refresh_font_cache
-			fi
-
-			if source_han_fonts_available; then
-				ensure_project_font_cache || true
-				echo "Source Han fonts are ready for XeLaTeX."
-				return 0
-			fi
-
+		if ! fandol_fonts_available; then
 			install_attempted=1
-			download_source_han_fonts || true
-
-			if source_han_fonts_available; then
+			download_fandol_fonts || true
+			if fandol_fonts_available; then
 				ensure_project_font_cache || true
-				echo "Source Han fonts are ready for XeLaTeX."
+				echo "Fandol fonts are ready for XeLaTeX."
 				return 0
 			fi
 		fi
 
 		if (( install_attempted == 0 )); then
-			echo "Warning: Source Han fonts are missing and no automatic installation was attempted." >&2
+			echo "Warning: Fandol fonts are missing and no automatic installation was attempted." >&2
 		else
-			echo "Warning: Source Han fonts remain unavailable after installation attempts." >&2
+			echo "Warning: Fandol fonts remain unavailable after installation attempts." >&2
 		fi
-		echo "Install Source Han Serif/Sans SC fonts manually so XeLaTeX can locate them." >&2
+		echo "Install Fandol fonts manually so XeLaTeX can locate them." >&2
 		return 1
 	}
 
-	ensure_source_han_fonts || true
+	ensure_fandol_fonts || true
 
 	declare -a missing_tex_packages=()
 	while IFS=: read -r pkg sty; do
