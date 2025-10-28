@@ -11,7 +11,7 @@ If you don't have Mango installed, install it first [Mango](https://github.com/M
 
 run
 ```bash
-mango submodule add git@github.com:rogerflowey/math-homework-template.git
+mango @submodule add git@github.com:rogerflowey/math-homework-template.git
 ```
 
 ### Manually
