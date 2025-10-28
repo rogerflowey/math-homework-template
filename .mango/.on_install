@@ -26,6 +26,18 @@ echo "Installing dependencies..."
 pip install -r "$repo_root/requirements.txt"
 echo "Installation complete!"
 
+# Copy template preamble into user repo for convenience.
+if [[ -n "${MANGO_REPO_PATH:-}" ]]; then
+	if [[ -f "$repo_root/preamble.tex" ]]; then
+		cp "$repo_root/preamble.tex" "$MANGO_REPO_PATH/"
+		echo "Copied preamble.tex to $MANGO_REPO_PATH"
+	else
+		echo "Warning: preamble.tex not found at $repo_root" >&2
+	fi
+else
+	echo "Warning: MANGO_REPO_PATH is not set; skipping preamble copy." >&2
+fi
+
 echo "Checking TeX Live packages..."
 if command -v kpsewhich >/dev/null 2>&1; then
 	declare -a missing_tex_packages=()
@@ -68,3 +80,4 @@ EOF
 else
 	echo "Warning: kpsewhich not found; skipping TeX package checks." >&2
 fi
+
