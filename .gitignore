@@ -1,5 +1,6 @@
 example.*
 */venv
+.mango/fonts/
 .kilocode/*
 *.aux
 *.fdb_latexmk

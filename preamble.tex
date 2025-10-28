@@ -1,8 +1,8 @@
 \documentclass[a4paper]{article}
 
 % PACKAGES
+\PassOptionsToPackage{no-math}{fontspec}
 \usepackage{amsmath, amssymb}
-\usepackage{amsthm}
 \usepackage{enumitem}
 \usepackage{setspace}
 \usepackage{indentfirst}
@@ -10,9 +10,12 @@
 \usepackage{mathtools}
 \usepackage{mathrsfs}
 \usepackage{graphicx}
+\usepackage[framed]{ntheorem}
 \usepackage{tabularray}
+\usepackage[UTF8]{ctex}
 \usepackage{multirow}
 \usepackage{physics}
+\usepackage[T1]{fontenc}
 \usepackage[strict]{changepage}
 \usepackage{pgfplots}
 \usepackage{tikz}
@@ -33,23 +36,23 @@
 \usepackage{wrapfig}
 \usepackage{fancyhdr}
 \usepackage{titlesec}
-\usepackage{hyperref}
+\usepackage{XCharter}
+\usepackage{unicode-math}
+\usepackage{xeCJK}
+\usepackage[colorlinks=true, linkcolor=red]{hyperref}
 \usepackage{geometry}
-\usepackage{iftex}
 
-\ifXeTeX
-    \usepackage{fontspec}
-    \usepackage{xeCJK}
-    \setmainfont{Latin Modern Roman}
-    \setsansfont{Latin Modern Sans}
-    \setmonofont{Latin Modern Mono}
-    \setCJKmainfont{FandolSong-Regular}
-    \setCJKsansfont{FandolHei-Regular}
-    \setCJKmonofont{FandolFang-Regular}
-\else
-    \usepackage[utf8]{inputenc}
-    \usepackage[T1]{fontenc}
-\fi
+\setmathfont{XCharter-Math}
+% Source Han fonts are provided by the environment setup script.
+\newcommand{\SourceHanFontDir}{.mango/fonts/sourcehan/}
+\setCJKmainfont[
+    Path=\SourceHanFontDir,
+    BoldFont=SourceHanSerifSC-Bold.otf
+]{SourceHanSerifSC-Regular.otf}
+\setCJKsansfont[
+    Path=\SourceHanFontDir,
+    BoldFont=SourceHanSansSC-Bold.otf
+]{SourceHanSansSC-Regular.otf}
 
 \geometry{a4paper, left=27mm, right=27mm, top=24mm, bottom=24mm,}
 
@@ -83,24 +86,78 @@
 \newcommand{\numP}{\#\mathbf{P}} 
 \renewcommand{\P}{\mathbf{P}}
 \newcommand{\defeq}{:=} 
-\renewcommand{\d}{\,\mathrm{d}}
+\renewcommand{\d}{\,\-d}
 \newcommand{\ol}{\overline}
 \newcommand{\Var}[2][]{\mathbf{Var}_{#1}\left[#2\right]}
+\renewcommand{\Pr}[2][]{\mathbf{Pr}_{#1}\left[#2\right]}
 \newcommand{\E}[2][]{\mathbf{E}_{#1}\left[#2\right]}
 \renewcommand{\emptyset}{\varnothing}
 \newcommand{\argmin}{\mathop{\arg\min}}
 \newcommand{\argmax}{\mathop{\arg\max}}
 \newcommand{\wh}{\widehat}
 
-% Custom theorem environments
-\newtheorem{question}{Question}
-\newtheorem{answer}{Answer}
+\theoremstyle{plain}
+\theoremheaderfont{\bfseries\upshape}
+\theorembodyfont{\normalfont}
+\theoremseparator{.}
+\theoremframepreskip{0.5\baselineskip}
+\theoremframepostskip{0.5\baselineskip}
+\theoreminframepreskip{0ex}
+\theoreminframepostskip{0ex}
+\newframedtheorem{question}{问题}
 
-% Use amsthm's proof environment instead of defining our own
-% This avoids conflicts with the existing proof environment
+\theoremstyle{nonumberbreak}
+\theoremheaderfont{\bfseries\upshape}
+\theorembodyfont{\normalfont}
+\theoremseparator{:}
+\theorempreskip{0.5\baselineskip}
+\theorempostskip{0.5\baselineskip}
+\newtheorem{answer}{解答}
+
+\definecolor{quoteshade}{RGB}{236,242,252}
+\definecolor{quoteleft}{RGB}{188,232,241}
+\colorlet{shadecolor}{quoteshade}
+
+\newlength{\quoteleftsep}
+\setlength{\quoteleftsep}{0em}
+\newlength{\quoteleftwidth}
+\setlength{\quoteleftwidth}{3pt}
+
+\newenvironment{quoteframe}{%
+    \def\FrameCommand{%
+        {\color{quoteleft}\vrule width \quoteleftwidth}%
+        \hspace{\quoteleftsep}%
+        \fboxsep=\FrameSep%
+        \colorbox{quoteshade}%
+    }%
+    \MakeFramed{%
+        \advance\hsize-\quoteleftsep%
+        \advance\hsize-\quoteleftwidth%
+        \advance\hsize-\width%
+        \FrameRestore%
+    }%
+}{\endMakeFramed}
+
+\theoremstyle{nonumberbreak}
+\theoremheaderfont{\bfseries\upshape}
+\theorembodyfont{\normalfont}
+\theoremseparator{}
+\theorempreskip{0.5\baselineskip}
+\theorempostskip{0.5\baselineskip}
+\theoremprework{\begin{quoteframe}}
+\theorempostwork{\end{quoteframe}}
+
+\newtheorem{quotebox}{}
+
+\theoremprework{}
+\theorempostwork{}
+
+\newenvironment{proof}{{\noindent\it Proof.}\par}{\hfill $\square$\par}
 
 \allowdisplaybreaks
 \setlength{\parindent}{0pt}
+\setlength{\lineskip}{\baselineskip-\ccwd}
+\setlength{\lineskiplimit}{2pt}
 \setlength{\abovedisplayskip}{4pt}
 \setlength{\belowdisplayskip}{4pt}
 \setlength{\abovedisplayshortskip}{4pt}
