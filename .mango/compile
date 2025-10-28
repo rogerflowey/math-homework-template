@@ -3,6 +3,7 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
+user_root="${MANGO_USER_PATH:-$repo_root}"
 
 # Check if xelatex is available
 if ! command -v xelatex &> /dev/null; then
@@ -17,4 +18,24 @@ if [ $# -eq 0 ]; then
 fi
 
 filename="$1"
-xelatex -interaction=nonstopmode -output-directory="$repo_root" "$repo_root/$filename"
+
+if [[ "$filename" = /* ]]; then
+    tex_path="$filename"
+else
+    tex_path=""
+    for base in "$user_root" "$repo_root"; do
+        candidate="$base/$filename"
+        if [[ -f "$candidate" ]]; then
+            tex_path="$candidate"
+            break
+        fi
+    done
+fi
+
+if [[ -z "${tex_path:-}" ]]; then
+    echo "Error: could not find $filename relative to $user_root or $repo_root" >&2
+    exit 1
+fi
+
+output_dir="$(dirname "$tex_path")"
+xelatex -interaction=nonstopmode -output-directory="$output_dir" "$tex_path"
