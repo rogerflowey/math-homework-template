@@ -40,6 +40,95 @@ fi
 
 echo "Checking TeX Live packages..."
 if command -v kpsewhich >/dev/null 2>&1; then
+	ensure_fandol_fonts() {
+		local -a fandol_files=(
+			FandolSong-Regular.otf
+			FandolHei-Regular.otf
+			FandolFang-Regular.otf
+		)
+
+		local have_tex_font=0
+		for _font in "${fandol_files[@]}"; do
+			if kpsewhich "$_font" >/dev/null 2>&1; then
+				have_tex_font=1
+				break
+			fi
+		done
+
+		if (( have_tex_font == 0 )); then
+			if command -v tlmgr >/dev/null 2>&1; then
+				echo "Installing Fandol fonts for CJK support via tlmgr..."
+				if tlmgr install fandol; then
+					have_tex_font=1
+				else
+					echo "Warning: tlmgr failed to install Fandol fonts." >&2
+				fi
+			fi
+		fi
+
+		if (( have_tex_font == 0 )) && command -v apt-get >/dev/null 2>&1; then
+			if dpkg-query -W -f='${Status}' fonts-fandol 2>/dev/null | grep -q 'installed'; then
+				echo "Fandol fonts already installed via apt."
+				have_tex_font=1
+			else
+				if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+					echo "Installing Fandol fonts for CJK support via apt..."
+					if sudo apt-get update; then
+						if sudo apt-get install -y fonts-fandol; then
+							have_tex_font=1
+							fc-cache -f >/dev/null 2>&1 || true
+						else
+							echo "Warning: apt installation of fonts-fandol failed." >&2
+						fi
+					else
+						echo "Warning: apt-get update failed; unable to install fonts-fandol automatically." >&2
+					fi
+				else
+					echo "Warning: fonts-fandol package missing and automatic installation requires sudo access." >&2
+					echo "Please install it manually (e.g. sudo apt-get install fonts-fandol)." >&2
+				fi
+			fi
+		fi
+
+		if (( have_tex_font == 0 )); then
+			echo "Warning: Fandol fonts are missing; XeLaTeX will not find them." >&2
+			echo "Install them manually using tlmgr or your OS package manager." >&2
+			return 1
+		fi
+
+		if command -v fc-list >/dev/null 2>&1 && fc-list | grep -qi 'Fandol'; then
+			echo "Fandol fonts detected in fontconfig cache."
+			return 0
+		fi
+
+		if command -v fc-cache >/dev/null 2>&1; then
+			local user_font_dir="$HOME/.local/share/fonts/fandol"
+			mkdir -p "$user_font_dir"
+			for _font in "${fandol_files[@]}"; do
+				local font_path
+				font_path=$(kpsewhich "$_font" 2>/dev/null || true)
+				if [[ -n "$font_path" && -f "$font_path" ]]; then
+					install -m644 "$font_path" "$user_font_dir/$_font" 2>/dev/null || cp "$font_path" "$user_font_dir/$_font" 2>/dev/null || true
+				fi
+			done
+			fc-cache -f "$user_font_dir" >/dev/null 2>&1 || fc-cache -f >/dev/null 2>&1 || true
+			if command -v fc-list >/dev/null 2>&1 && fc-list | grep -qi 'Fandol'; then
+				echo "Fandol fonts registered with fontconfig."
+				return 0
+			fi
+			if [[ -f "$user_font_dir/FandolSong-Regular.otf" ]]; then
+				echo "Fandol fonts copied into $user_font_dir."
+				return 0
+			fi
+		fi
+
+		echo "Warning: Unable to register Fandol fonts with fontconfig automatically." >&2
+		echo "You may need to install them system-wide so XeLaTeX can locate them." >&2
+		return 1
+	}
+
+	ensure_fandol_fonts || true
+
 	declare -a missing_tex_packages=()
 	while IFS=: read -r pkg sty; do
 		[[ -z "$pkg" || -z "$sty" ]] && continue
@@ -66,17 +155,17 @@ hyperref:hyperref.sty
 mathtools:mathtools.sty
 EOF
 
-	if (( ${#missing_tex_packages[@]} > 0 )); then
-		if command -v tlmgr >/dev/null 2>&1; then
-			echo "Installing missing TeX packages via tlmgr: ${missing_tex_packages[*]}"
-			tlmgr install "${missing_tex_packages[@]}"
-		else
-			echo "Warning: Missing TeX packages detected (${missing_tex_packages[*]}), but tlmgr is not available." >&2
-			echo "Please install them using your TeX distribution's package manager." >&2
-		fi
-	else
-		echo "All required TeX packages are present."
-	fi
+    if (( ${#missing_tex_packages[@]} > 0 )); then
+        if command -v tlmgr >/dev/null 2>&1; then
+            echo "Installing missing TeX packages via tlmgr: ${missing_tex_packages[*]}"
+            tlmgr install "${missing_tex_packages[@]}"
+        else
+            echo "Warning: Missing TeX packages detected (${missing_tex_packages[*]}), but tlmgr is not available." >&2
+            echo "Please install them using your TeX distribution's package manager." >&2
+        fi
+    else
+        echo "All required TeX packages are present."
+    fi
 else
 	echo "Warning: kpsewhich not found; skipping TeX package checks." >&2
 fi
