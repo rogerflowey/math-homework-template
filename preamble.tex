@@ -13,7 +13,6 @@
 \usepackage{tabularray}
 \usepackage{multirow}
 \usepackage{physics}
-\usepackage[T1]{fontenc}
 \usepackage[strict]{changepage}
 \usepackage{pgfplots}
 \usepackage{tikz}
@@ -36,6 +35,21 @@
 \usepackage{titlesec}
 \usepackage{hyperref}
 \usepackage{geometry}
+\usepackage{iftex}
+
+\ifXeTeX
+    \usepackage{fontspec}
+    \usepackage{xeCJK}
+    \setmainfont{Latin Modern Roman}
+    \setsansfont{Latin Modern Sans}
+    \setmonofont{Latin Modern Mono}
+    \setCJKmainfont{FandolSong-Regular}
+    \setCJKsansfont{FandolHei-Regular}
+    \setCJKmonofont{FandolFang-Regular}
+\else
+    \usepackage[utf8]{inputenc}
+    \usepackage[T1]{fontenc}
+\fi
 
 \geometry{a4paper, left=27mm, right=27mm, top=24mm, bottom=24mm,}
 
