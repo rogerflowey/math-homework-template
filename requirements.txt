@@ -1,0 +1,5 @@
+# Production dependencies
+requests>=2.25.0,<3.0.0
+beautifulsoup4>=4.9.0,<5.0.0
+markdownify>=0.6.0,<1.0.0
+lxml>=4.6.0,<5.0.0
